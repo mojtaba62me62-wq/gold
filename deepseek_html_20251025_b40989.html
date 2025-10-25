@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="fa" dir="rtl" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>افزایش سهم طلا بر مبنای استراتژی های دکتر بیداروندی</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .number-input {
+            direction: ltr;
+            text-align: left;
+        }
+        .profit {
+            color: #10b981;
+        }
+        .loss {
+            color: #ef4444;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="h-full bg-gradient-to-br from-blue-50 to-indigo-100">
+    <main class="container mx-auto px-4 py-8 h-full">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">افزایش سهم طلا بر مبنای استراتژی های دکتر بیداروندی</h1>
+            <p class="text-gray-600">مدیریت و محاسبه سود و زیان سهام شما</p>
+        </header>
+
+        <!-- فرم افزودن سهم جدید -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">افزودن سهم جدید</h2>
+            <form id="stock-form" class="space-y-4">
+                <div>
+                    <label for="stock-name" class="block text-sm font-medium text-gray-700 mb-2">نام سهم</label>
+                    <input type="text" id="stock-name" required 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="مثال: نماد طلا">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="shares-count" class="block text-sm font-medium text-gray-700 mb-2">تعداد سهم</label>
+                        <input type="number" id="shares-count" required min="1" step="1" 
+                               class="number-input w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="1000">
+                    </div>
+                    <div>
+                        <label for="break-even-price" class="block text-sm font-medium text-gray-700 mb-2">قیمت سر به سر (تومان)</label>
+                        <input type="number" id="break-even-price" required min="0" step="0.01" 
+                               class="number-input w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="50000">
+                    </div>
+                    <div>
+                        <label for="current-price" class="block text-sm font-medium text-gray-700 mb-2">قیمت فعلی (تومان)</label>
+                        <input type="number" id="current-price" required min="0" step="0.01" 
+                               class="number-input w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="55000">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200">
+                    افزودن سهم
+                </button>
+            </form>
+        </div>
+
+        <!-- خلاصه کل پورتفولیو -->
+        <div id="portfolio-summary" class="bg-white rounded-xl shadow-lg p-6 mb-8" style="display: none;">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">خلاصه پورتفولیو</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">کل سرمایه گذاری</p>
+                    <p id="total-investment" class="text-2xl font-bold text-blue-600">0 تومان</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">ارزش فعلی</p>
+                    <p id="current-value" class="text-2xl font-bold text-green-600">0 تومان</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">سود/زیان کل</p>
+                    <p id="total-profit-loss" class="text-2xl font-bold">0 تومان</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- لیست سهام -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">لیست سهام</h2>
+            <div id="stocks-list" class="space-y-4">
+                <div id="empty-state" class="text-center py-12">
+                    <div class="text-6xl mb-4">📈</div>
+                    <p class="text-gray-500 text-lg">هنوز سهمی اضافه نکرده‌اید</p>
+                    <p class="text-gray-400">اولین سهم خود را اضافه کنید</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // مدیریت داده‌ها با localStorage
+        let stocks = JSON.parse(localStorage.getItem('goldStocks')) || [];
+        let recordCount = stocks.length;
+
+        // توابع کمکی
+        function formatNumber(num) {
+            return new Intl.NumberFormat('fa-IR').format(num);
+        }
+
+        function calculateProfitLoss(shares, breakEvenPrice, currentPrice) {
+            const investment = shares * breakEvenPrice;
+            const currentValue = shares * currentPrice;
+            return currentValue - investment;
+        }
+
+        function saveStocks() {
+            localStorage.setItem('goldStocks', JSON.stringify(stocks));
+        }
+
+        function showMessage(message, type = 'success') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `fixed top-4 right-4 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-6 py-3 rounded-lg shadow-lg z-50`;
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+
+        // توابع رندر
+        function renderStocksList() {
+            const stocksList = document.getElementById('stocks-list');
+            const emptyState = document.getElementById('empty-state');
+            const portfolioSummary = document.getElementById('portfolio-summary');
+
+            if (stocks.length === 0) {
+                emptyState.style.display = 'block';
+                portfolioSummary.style.display = 'none';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            portfolioSummary.style.display = 'block';
+
+            // پاک کردن سهام موجود
+            const existingStocks = stocksList.querySelectorAll('.stock-item');
+            existingStocks.forEach(item => item.remove());
+
+            // رندر کردن سهام
+            stocks.forEach(stock => {
+                const stockElement = createStockElement(stock);
+                stocksList.appendChild(stockElement);
+            });
+        }
+
+        function createStockElement(stock) {
+            const profitLoss = calculateProfitLoss(stock.shares_count, stock.break_even_price, stock.current_price);
+            const profitLossPercentage = ((stock.current_price - stock.break_even_price) / stock.break_even_price * 100).toFixed(2);
+            const isProfit = profitLoss >= 0;
+
+            const stockDiv = document.createElement('div');
+            stockDiv.className = 'stock-item bg-gray-50 rounded-lg p-4 border border-gray-200';
+            stockDiv.dataset.stockId = stock.id;
+
+            stockDiv.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <h3 class="text-xl font-semibold text-gray-800">${stock.stock_name}</h3>
+                    <button onclick="deleteStock('${stock.id}')" 
+                            class="text-red-500 hover:text-red-700 text-sm px-3 py-1 rounded border border-red-300 hover:border-red-500 transition duration-200">
+                        حذف
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <p class="text-sm text-gray-600">تعداد سهم</p>
+                        <p class="font-semibold">${formatNumber(stock.shares_count)}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">قیمت سر به سر</p>
+                        <p class="font-semibold">${formatNumber(stock.break_even_price)} تومان</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">قیمت فعلی</p>
+                        <p class="font-semibold">${formatNumber(stock.current_price)} تومان</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">سود/زیان</p>
+                        <p class="font-semibold ${isProfit ? 'profit' : 'loss'}">
+                            ${formatNumber(profitLoss)} تومان
+                            <span class="text-sm">(${profitLossPercentage}%)</span>
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded p-3 mb-4">
+                    <div class="flex justify-between text-sm">
+                        <span>سرمایه گذاری: ${formatNumber(stock.shares_count * stock.break_even_price)} تومان</span>
+                        <span>ارزش فعلی: ${formatNumber(stock.shares_count * stock.current_price)} تومان</span>
+                    </div>
+                </div>
+
+                ${isProfit ? `
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 class="text-lg font-semibold text-green-800 mb-3">استراتژی‌های فروش و خرید مجدد</h4>
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">قیمت خرید مجدد (تومان)</label>
+                        <input type="number" id="rebuy-price-${stock.id}" 
+                               class="number-input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                               placeholder="قیمت پایین‌تر برای خرید مجدد" min="0" step="0.01">
+                    </div>
+                    <div id="strategies-${stock.id}" class="space-y-2">
+                        <!-- استراتژی‌ها اینجا نمایش داده می‌شوند -->
+                    </div>
+                    <button onclick="calculateStrategies('${stock.id}')" 
+                            id="calc-btn-${stock.id}"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 mt-3">
+                        محاسبه استراتژی‌ها
+                    </button>
+                </div>
+                ` : ''}
+            `;
+
+            return stockDiv;
+        }
+
+        function updatePortfolioSummary() {
+            let totalInvestment = 0;
+            let currentValue = 0;
+
+            stocks.forEach(stock => {
+                totalInvestment += stock.shares_count * stock.break_even_price;
+                currentValue += stock.shares_count * stock.current_price;
+            });
+
+            const totalProfitLoss = currentValue - totalInvestment;
+            const isProfit = totalProfitLoss >= 0;
+
+            document.getElementById('total-investment').textContent = `${formatNumber(totalInvestment)} تومان`;
+            document.getElementById('current-value').textContent = `${formatNumber(currentValue)} تومان`;
+            
+            const profitLossElement = document.getElementById('total-profit-loss');
+            profitLossElement.textContent = `${formatNumber(totalProfitLoss)} تومان`;
+            profitLossElement.className = `text-2xl font-bold ${isProfit ? 'profit' : 'loss'}`;
+        }
+
+        // محاسبه استراتژی‌ها
+        function calculateStrategies(stockId) {
+            const stock = stocks.find(s => s.id === stockId);
+            if (!stock) return;
+
+            const rebuyPriceInput = document.getElementById(`rebuy-price-${stockId}`);
+            const rebuyPrice = parseFloat(rebuyPriceInput.value);
+            
+            if (!rebuyPrice || rebuyPrice <= 0) {
+                showMessage('لطفاً قیمت خرید مجدد را وارد کنید', 'error');
+                return;
+            }
+
+            if (rebuyPrice >= stock.current_price) {
+                showMessage('قیمت خرید مجدد باید کمتر از قیمت فعلی باشد', 'error');
+                return;
+            }
+
+            const strategiesContainer = document.getElementById(`strategies-${stockId}`);
+            
+            // محاسبه استراتژی‌ها
+            const currentValue = stock.shares_count * stock.current_price;
+            const originalInvestment = stock.shares_count * stock.break_even_price;
+            const totalProfit = currentValue - originalInvestment;
+
+            // استراتژی 1: فقط سود را برداشت
+            const strategy1 = {
+                name: "استراتژی ۱: برداشت فقط سود",
+                sellAmount: totalProfit,
+                sellShares: Math.floor(totalProfit / stock.current_price),
+                remainingShares: stock.shares_count - Math.floor(totalProfit / stock.current_price),
+                newShares: Math.floor(totalProfit / rebuyPrice)
+            };
+
+            // استراتژی 2: فروش یک سوم
+            const oneThirdShares = Math.floor(stock.shares_count / 3);
+            const strategy2 = {
+                name: "استراتژی ۲: فروش یک سوم سهام",
+                sellAmount: oneThirdShares * stock.current_price,
+                sellShares: oneThirdShares,
+                remainingShares: stock.shares_count - oneThirdShares,
+                newShares: Math.floor((oneThirdShares * stock.current_price) / rebuyPrice)
+            };
+
+            // استراتژی 3: فروش نصف
+            const halfShares = Math.floor(stock.shares_count / 2);
+            const strategy3 = {
+                name: "استراتژی ۳: فروش نصف سهام",
+                sellAmount: halfShares * stock.current_price,
+                sellShares: halfShares,
+                remainingShares: stock.shares_count - halfShares,
+                newShares: Math.floor((halfShares * stock.current_price) / rebuyPrice)
+            };
+
+            // استراتژی 4: فروش کل
+            const strategy4 = {
+                name: "استراتژی ۴: فروش کل سهام",
+                sellAmount: currentValue,
+                sellShares: stock.shares_count,
+                remainingShares: 0,
+                newShares: Math.floor(currentValue / rebuyPrice)
+            };
+
+            const strategies = [strategy1, strategy2, strategy3, strategy4];
+
+            // مخفی کردن دکمه محاسبه
+            const calcButton = document.getElementById(`calc-btn-${stockId}`);
+            if (calcButton) {
+                calcButton.style.display = 'none';
+            }
+
+            strategiesContainer.innerHTML = strategies.map(strategy => `
+                <div class="bg-white border border-gray-200 rounded-lg p-3">
+                    <h5 class="font-semibold text-gray-800 mb-2">${strategy.name}</h5>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                            <span class="text-gray-600">فروش:</span>
+                            <span class="font-medium">${formatNumber(strategy.sellShares)} سهم</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">مبلغ فروش:</span>
+                            <span class="font-medium">${formatNumber(strategy.sellAmount)} تومان</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">باقی‌مانده:</span>
+                            <span class="font-medium">${formatNumber(strategy.remainingShares)} سهم</span>
+                        </div>
+                        <div class="col-span-2 bg-blue-50 p-2 rounded">
+                            <div class="flex justify-between items-center">
+                                <span class="text-blue-800 font-semibold">سهام جدید قابل خرید: ${formatNumber(strategy.newShares)} سهم</span>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-blue-200">
+                                <span class="text-green-700 font-bold">+ سهام اضافی: ${formatNumber(strategy.newShares - strategy.sellShares)} سهم</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // اضافه کردن بخش محاسبه سود آینده
+            const profitProjectionDiv = document.createElement('div');
+            profitProjectionDiv.className = 'bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4';
+            profitProjectionDiv.innerHTML = `
+                <h5 class="font-semibold text-yellow-800 mb-3">💡 محاسبه سود آینده</h5>
+                <p class="text-sm text-yellow-700 mb-3">
+                    می‌خوای بدونی اگر از این استراتژی‌ها استفاده کنی و قیمت سهم دوباره به ${formatNumber(stock.current_price)} تومان برسه، چقدر سودت افزایش پیدا می‌کنه؟
+                </p>
+                <div class="flex gap-2">
+                    <button onclick="calculateFutureProfit('${stockId}', ${stock.current_price}, ${rebuyPrice})" 
+                            class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                        بله، محاسبه کن
+                    </button>
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            class="bg-gray-400 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                        نه، نیازی نیست
+                    </button>
+                </div>
+                <div id="future-profit-${stockId}" class="mt-4" style="display: none;"></div>
+            `;
+            
+            strategiesContainer.appendChild(profitProjectionDiv);
+        }
+
+        // محاسبه سود آینده
+        function calculateFutureProfit(stockId, targetPrice, rebuyPrice) {
+            const stock = stocks.find(s => s.id === stockId);
+            if (!stock) return;
+
+            const futureContainer = document.getElementById(`future-profit-${stockId}`);
+            
+            // محاسبه استراتژی‌ها
+            const currentValue = stock.shares_count * stock.current_price;
+            const originalInvestment = stock.shares_count * stock.break_even_price;
+            const totalProfit = currentValue - originalInvestment;
+
+            const strategies = [
+                {
+                    name: "استراتژی ۱: برداشت فقط سود",
+                    sellShares: Math.floor(totalProfit / stock.current_price),
+                    newShares: Math.floor(totalProfit / rebuyPrice)
+                },
+                {
+                    name: "استراتژی ۲: فروش یک سوم سهام",
+                    sellShares: Math.floor(stock.shares_count / 3),
+                    newShares: Math.floor((Math.floor(stock.shares_count / 3) * stock.current_price) / rebuyPrice)
+                },
+                {
+                    name: "استراتژی ۳: فروش نصف سهام",
+                    sellShares: Math.floor(stock.shares_count / 2),
+                    newShares: Math.floor((Math.floor(stock.shares_count / 2) * stock.current_price) / rebuyPrice)
+                },
+                {
+                    name: "استراتژی ۴: فروش کل سهام",
+                    sellShares: stock.shares_count,
+                    newShares: Math.floor(currentValue / rebuyPrice)
+                }
+            ];
+
+            // محاسبه مقادیر نهایی
+            strategies.forEach(strategy => {
+                strategy.remainingShares = stock.shares_count - strategy.sellShares;
+                strategy.totalShares = strategy.remainingShares + strategy.newShares;
+            });
+
+            // محاسبه سود آینده
+            const originalFutureValue = stock.shares_count * targetPrice;
+            const originalFutureProfit = originalFutureValue - originalInvestment;
+
+            futureContainer.innerHTML = `
+                <h6 class="font-semibold text-gray-800 mb-3">🚀 مقایسه سود آینده (قیمت هدف: ${formatNumber(targetPrice)} تومان)</h6>
+                <div class="space-y-3">
+                    <div class="bg-gray-100 p-3 rounded-lg">
+                        <h6 class="font-medium text-gray-800">بدون استراتژی (نگه داشتن کل سهام)</h6>
+                        <div class="text-sm text-gray-600 mt-1">
+                            <span>سهام: ${formatNumber(stock.shares_count)} | </span>
+                            <span>ارزش آینده: ${formatNumber(originalFutureValue)} تومان | </span>
+                            <span class="font-semibold text-green-600">سود: ${formatNumber(originalFutureProfit)} تومان</span>
+                        </div>
+                    </div>
+                    ${strategies.map(strategy => {
+                        const futureValue = strategy.totalShares * targetPrice;
+                        const futureProfit = futureValue - originalInvestment;
+                        const profitIncrease = futureProfit - originalFutureProfit;
+                        const profitIncreasePercent = ((profitIncrease / originalFutureProfit) * 100).toFixed(1);
+                        
+                        return `
+                        <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                            <h6 class="font-medium text-blue-800">${strategy.name}</h6>
+                            <div class="text-sm text-gray-600 mt-1">
+                                <span>سهام نهایی: ${formatNumber(strategy.totalShares)} | </span>
+                                <span>ارزش آینده: ${formatNumber(futureValue)} تومان | </span>
+                                <span class="font-semibold text-green-600">سود: ${formatNumber(futureProfit)} تومان</span>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-blue-200">
+                                <span class="font-bold ${profitIncrease >= 0 ? 'text-green-700' : 'text-red-600'}">
+                                    سود ${formatNumber(strategy.totalShares - stock.shares_count)} سهم اضافه = ${formatNumber((strategy.totalShares - stock.shares_count) * targetPrice)} تومان 
+                                    (${profitIncreasePercent >= 0 ? '+' : ''}${profitIncreasePercent}%)
+                                </span>
+                            </div>
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            
+            futureContainer.style.display = 'block';
+            
+            // مخفی کردن دکمه‌ها
+            const buttonContainer = futureContainer.previousElementSibling;
+            if (buttonContainer && buttonContainer.classList.contains('flex')) {
+                buttonContainer.style.display = 'none';
+            }
+        }
+
+        // مدیریت سهام
+        function addStock(event) {
+            event.preventDefault();
+            
+            if (recordCount >= 999) {
+                showMessage('حداکثر 999 سهم قابل ثبت است. لطفاً ابتدا برخی سهام را حذف کنید.', 'error');
+                return;
+            }
+            
+            const stockName = document.getElementById('stock-name').value.trim();
+            const sharesCount = parseInt(document.getElementById('shares-count').value);
+            const breakEvenPrice = parseFloat(document.getElementById('break-even-price').value);
+            const currentPrice = parseFloat(document.getElementById('current-price').value);
+
+            if (!stockName || !sharesCount || !breakEvenPrice || !currentPrice) {
+                showMessage('لطفاً تمام فیلدها را پر کنید', 'error');
+                return;
+            }
+
+            const newStock = {
+                id: Date.now().toString(),
+                stock_name: stockName,
+                shares_count: sharesCount,
+                break_even_price: breakEvenPrice,
+                current_price: currentPrice
+            };
+
+            stocks.push(newStock);
+            recordCount = stocks.length;
+            saveStocks();
+            renderStocksList();
+            updatePortfolioSummary();
+            document.getElementById('stock-form').reset();
+            
+            showMessage('سهم با موفقیت اضافه شد!');
+        }
+
+        function deleteStock(stockId) {
+            if (confirm('آیا از حذف این سهم مطمئن هستید؟')) {
+                stocks = stocks.filter(s => s.id !== stockId);
+                recordCount = stocks.length;
+                saveStocks();
+                renderStocksList();
+                updatePortfolioSummary();
+                showMessage('سهم با موفقیت حذف شد!');
+            }
+        }
+
+        // راه‌اندازی برنامه
+        function initializeApp() {
+            document.getElementById('stock-form').addEventListener('submit', addStock);
+            renderStocksList();
+            updatePortfolioSummary();
+        }
+
+        // شروع برنامه وقتی DOM لود شد
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
